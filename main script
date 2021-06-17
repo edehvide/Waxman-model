@@ -1,0 +1,171 @@
+## Main file ##
+
+# Imports
+from bisect import bisect_left
+from functools import reduce
+from itertools import product
+import math, random, sys
+import networkx as nx
+import matplotlib.pyplot as plt
+import pandas as pd
+import csv
+import pylab as plt
+import glob
+import collections
+
+
+# Set number to number of runs you wish to do
+i = 0
+while i < 1:
+
+
+  filenames = sorted(glob.glob('/content/*.csv'))
+  for filename in filenames:
+
+  # Read data file
+    data = pd.read_csv(filename, usecols=['X','Y']) # reads data file
+
+    # Extracts data
+    minValues = data.min() 
+    maxValues = data.max()
+
+    # Normalizer variable, edge creation variables
+
+    alpha = 0.18
+  
+    beta = 0.15
+
+    # Creates graph and adds nodes taken from data file
+    G = nx.Graph()
+    G.clear()
+    G.add_nodes_from(range(len(data))) #build nr. of nodes as present in input data, random positions here 
+    (xmin,ymin,xmax,ymax)=(minValues[0], minValues[1], maxValues[0], maxValues[1] ) #finds the extremities of input data
+      
+    # Sets nodes to positions extracted from input, normalized by L
+    for n in G:
+        G.nodes[n]['pos']=((data.at[n,'X'])/xmax), ((data.at[n,'Y'])/ymax)
+
+
+    # Calculates maximum eucledean distance between nodes, to be used in edge-creating equation
+
+    l = 0
+    pos = list(nx.get_node_attributes(G,'pos').values())
+    while pos:
+        x1,y1 = pos.pop()
+        for x2,y2 in pos:
+            r2 = (x1-x2)**2 + (y1-y2)**2
+            if r2 > l:
+                l = r2
+                l=math.sqrt(l)
+
+    # Probabilities of edge between each respective pair of nodes
+    # are calculated and added if above threshold
+
+    nodes=G.nodes()
+    for a in nodes:
+        x1,y1 = G.nodes[a]['pos']
+        for b in nodes:
+            x2,y2 = G.nodes[b]['pos']  
+            r = math.sqrt((x1-x2)**2 + (y1-y2)**2)
+            if random.random() < alpha*math.exp(-r/(alpha*l)):
+                G.add_edge(a,b)
+
+
+    #######################
+
+    # Display graph and parameters of interest
+
+    #######################
+
+    pos = list(nx.get_node_attributes(G,'pos').values())
+    print("   ")
+    print("   ")
+    print("Image: ",filename,"has been processed, here are your results: ")
+    print("The paramters used were: ","alpha:",alpha , "beta:",beta , "L:", l)
+    print("   ")
+    print("   ")
+    print("Average clustering: " , nx.average_clustering(G))
+    Gcc = G.subgraph(sorted(nx.connected_components(G), key=len, reverse=True)[0])
+    print("Average shortest path length: " , nx.average_shortest_path_length(Gcc))
+
+
+    ## Bad attept to fix not connected graph, did not work ##
+
+    # print(list(nx.connected_components(G)))
+    #for g in nx.connected_component_subgraphs(G):
+    #    print(nx.average_shortest_path_length(g))
+    
+    #Gcc1 = G.subgraph(sorted(nx.connected_components(G), key=len, reverse=True)[0])
+    
+    #print(nx.connected_components(Gcc1))
+    
+    #total = length/(float(len(nx.connected_components(G))))
+    #print("Average shortest path length: " , total)
+
+
+
+    # Source: <https://doi.org/10.1103/PhysRevLett.87.198701>
+    print("Global efficiency: " , nx.global_efficiency(G))
+
+    #print("Average degree connectivity: " , nx.average_degree_connectivity(G)) 
+    nx.draw_networkx(G, pos, node_size= 100, node_color= 'blue', label = 'Waxman model of cells', with_labels=False)
+    #print("Small-worldness: " , nx.omega(G, niter=2, nrand=1))
+    #plt.savefig('networkgraph_O1_1.png')
+
+
+    #######################
+
+    # Display node connectivity degree with histogram
+
+    #######################
+
+    degree_sequence = sorted([d for n, d in G.degree()], reverse=True)  # degree sequence
+    degreeCount = collections.Counter(degree_sequence)
+    deg, cnt = zip(*degreeCount.items())
+
+    print("   ")
+    print("   ")
+    print("   ")
+    print("The following figure presents the node connectivity of the network: ")
+    fig, ax = plt.subplots()
+    plt.bar(deg, cnt, width=0.80, color="b")
+    plt.title("Degree Histogram")
+    plt.ylabel("Count")
+    plt.xlabel("Degree")
+    ax.set_xticks([d + 0.4 for d in deg])
+    ax.set_xticklabels(deg)
+
+    # draw graph in inset
+    plt.axes([0.4, 0.4, 0.5, 0.5])
+    Gcc = G.subgraph(sorted(nx.connected_components(G), key=len, reverse=True)[0])
+    pos = nx.spring_layout(G)
+    plt.axis("off")
+    nx.draw_networkx_nodes(G, pos, node_size=20)
+    nx.draw_networkx_edges(G, pos, alpha=0.4)
+    # takes out network in graph
+    plt.show()
+
+    #################
+
+    # Plot degree frequency
+
+    #################
+
+    degree_freq = nx.degree_histogram(G)
+    degrees = range(len(degree_freq))
+    print("   ")
+    print("   ")
+    print("   ")
+    print("The following figure presents the degree frequency of the network: ")
+    plt.figure(figsize=(6, 4)) 
+    m = 6
+    plt.loglog(degrees[m:], degree_freq[m:],'go-') 
+    plt.xlabel('Degree')
+    plt.ylabel('Frequency')
+    plt.show()
+
+    # Clears G for next iteration
+    G.clear()
+    plt.close()
+    
+    i += 1
